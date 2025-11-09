@@ -1,76 +1,56 @@
-import "./App.css";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginForm from "./components/loginform";
-import RegisForm from "./components/regisform";
-import { useState } from "react";
+import RegisterForm from "./components/registerform";
+import StudentDashboard from "./components/dashboard/stu-dashboard";
+import InstructorDashboard from "./components/dashboard/ins-dashboard";
+import { ProtectedRoute, PublicRoute } from "./components/protected_route";
 
 function App() {
-  const [page, setPage] = useState("login");
-
   return (
-    <div className="App">
-      <main style={{ padding: 24, maxWidth: 480, margin: "0 auto" }}>
-        <div
-          style={{
-            display: "flex",
-            gap: 2,
-            marginBottom: 24,
-            backgroundColor: "#edf2f7",
-            padding: 2,
-            borderRadius: 6,
-          }}
-        >
-          <button
-            onClick={() => setPage("login")}
-            style={{
-              flex: 1,
-              padding: "0.75rem",
-              border: "none",
-              borderRadius: 4,
-              fontSize: "0.875rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              backgroundColor: page === "login" ? "#ffffff" : "transparent",
-              color: page === "login" ? "#2d3748" : "#4a5568",
-              boxShadow:
-                page === "login" ? "0 1px 3px 0 rgba(0, 0, 0, 0.1)" : "none",
-              transition: "all 0.2s ease",
-            }}
-          >
-            Sign In
-          </button>
-          <button
-            onClick={() => setPage("register")}
-            style={{
-              flex: 1,
-              padding: "0.75rem",
-              border: "none",
-              borderRadius: 4,
-              fontSize: "0.875rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              backgroundColor: page === "register" ? "#ffffff" : "transparent",
-              color: page === "register" ? "#2d3748" : "#4a5568",
-              boxShadow:
-                page === "register" ? "0 1px 3px 0 rgba(0, 0, 0, 0.1)" : "none",
-              transition: "all 0.2s ease",
-            }}
-          >
-            Sign Up
-          </button>
-        </div>
+    <BrowserRouter>
+      <Routes>
+        {/* Default route - redirect to login */}
+        <Route path="/" element={<Navigate to="/login" replace />} />
 
-        {page === "login" ? (
-          <LoginForm onRegisterClick={() => setPage("register")} />
-        ) : (
-          <RegisForm
-            onRegisterSuccess={() => {
-              setPage("login");
-            }}
-            onLoginClick={() => setPage("login")}
-          />
-        )}
-      </main>
-    </div>
+        {/* Authentication routes */}
+        <Route
+          path="/login"
+          element={
+            <PublicRoute>
+              <LoginForm />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <PublicRoute>
+              <RegisterForm />
+            </PublicRoute>
+          }
+        />
+
+        {/* Student Dashboard */}
+        <Route
+          path="/dashboard/student"
+          element={
+            <ProtectedRoute>
+              <StudentDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Instructor Dashboard */}
+        <Route
+          path="/dashboard/instructor"
+          element={
+            <ProtectedRoute>
+              <InstructorDashboard />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

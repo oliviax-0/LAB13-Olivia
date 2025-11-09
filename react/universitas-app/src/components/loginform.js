@@ -1,235 +1,240 @@
 import React, { useState } from "react";
-import { login } from "../services/service";
+import { useNavigate } from "react-router-dom";
+import { dashboardService, authService } from "../services/service";
 
-export default function LoginForm({ onRegisterClick }) {
+const LoginForm = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const validate = () => {
-    if (!email.trim()) {
-      setError("Email is required");
-      return false;
-    }
-    // basic email pattern
-    const re = /^\S+@\S+\.\S+$/;
-    if (!re.test(email)) {
-      setError("Enter a valid email address");
-      return false;
-    }
-    if (!password) {
-      setError("Password is required");
-      return false;
-    }
-    return true;
-  };
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Clear previous messages
     setError("");
-    setSuccess(false);
-    if (!validate()) return;
+    setSuccess("");
     setLoading(true);
+
     try {
-      const data = await login(email, password);
-      // backend returns `token` object with access/refresh and other user fields
-      if (data.token && data.token.access) {
-        localStorage.setItem("authToken", data.token.access);
-      } else if (data.access) {
-        localStorage.setItem("authToken", data.access);
-      } else if (data.token) {
-        localStorage.setItem("authData", JSON.stringify(data.token));
-      } else {
-        localStorage.setItem("authData", JSON.stringify(data));
-      }
-      setSuccess(true);
+      const response = await authService.login(email, password);
+      console.log("✅ Login successful:", response);
+
+      // ✅ PERBAIKAN: Normalisasi role ke lowercase sebelum disimpan
+      const normalizedRole = response.role?.toLowerCase().trim();
+      
+      // Debug log untuk memastikan data tersimpan dengan benar
+      console.log("📝 Saving to localStorage:", {
+        email: response.email,
+        role: normalizedRole,
+        original_role: response.role
+      });
+
+      // Simpan ke localStorage dengan format yang konsisten
+      localStorage.setItem("user_email", response.email);
+      localStorage.setItem("user_role", normalizedRole); // ✅ Simpan dalam lowercase
+      localStorage.setItem("access_token", response.access_token);
+      
+      // Simpan juga data user lengkap untuk keperluan lain
+      localStorage.setItem("user_data", JSON.stringify({
+        email: response.email,
+        role: normalizedRole,
+        full_name: response.full_name || "",
+        major: response.major || ""
+      }));
+
+      // Show success message
+      setSuccess("Login berhasil! Redirecting...");
+
+      // Redirect based on normalized role
+      setTimeout(() => {
+        // ✅ Gunakan normalized role untuk routing
+        if (normalizedRole === "student" || normalizedRole === "mahasiswa") {
+          navigate("/dashboard/student");
+        } else if (normalizedRole === "instructor" || normalizedRole === "dosen") {
+          navigate("/dashboard/instructor");
+        } else if (normalizedRole === "admin") {
+          navigate("/dashboard/admin");
+        } else {
+          console.warn("⚠️ Unknown role:", normalizedRole);
+          navigate("/");
+        }
+      }, 1000);
     } catch (err) {
-      const message =
-        (err &&
-          (err.detail || err.message || err.non_field_errors || err.error)) ||
-        "Login failed";
-      if (Array.isArray(message)) setError(message.join(" "));
-      else if (typeof message === "object") setError(JSON.stringify(message));
-      else setError(String(message));
+      console.error("❌ Login error details:", err);
+
+      // Handle different error types
+      if (err.message) {
+        setError(err.message);
+      } else if (err.detail) {
+        setError(err.detail);
+      } else if (err.non_field_errors) {
+        setError(err.non_field_errors[0]);
+      } else if (err.email) {
+        setError(`Email: ${err.email[0]}`);
+      } else if (err.password) {
+        setError(`Password: ${err.password[0]}`);
+      } else if (typeof err === "string") {
+        setError(err);
+      } else {
+        setError("Login failed! Please check your email and password.");
+      }
+
+      setSuccess("");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div
-      style={{
-        maxWidth: 400,
-        margin: "2rem auto",
-        padding: 32,
-        border: "1px solid #e2e8f0",
-        borderRadius: 8,
-        boxShadow:
-          "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
-        backgroundColor: "#ffffff",
-      }}
-    >
-      <h2
-        style={{
-          marginTop: 0,
-          marginBottom: 24,
-          fontSize: "1.5rem",
-          fontWeight: 600,
-          color: "#1a202c",
-          textAlign: "center",
-        }}
-      >
-        Welcome Back
-      </h2>
-
-      {error && (
-        <div
-          role="alert"
-          style={{
-            color: "#e53e3e",
-            backgroundColor: "#fff5f5",
-            padding: "0.75rem 1rem",
-            borderRadius: 4,
-            marginBottom: 16,
-            fontSize: "0.875rem",
-          }}
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-tr from-blue-100 via-purple-50 to-pink-100">
+      <div className="w-full max-w-md p-8">
+        <form
+          onSubmit={handleSubmit}
+          className="bg-white backdrop-blur-lg bg-opacity-90 p-8 rounded-2xl shadow-xl border border-purple-100"
         >
-          {error}
-        </div>
-      )}
+          <div className="mb-8 text-center">
+            <h2 className="text-3xl font-bold text-purple-800 mb-2">
+              Welcome Back! 👋
+            </h2>
+            <p className="text-gray-600">Please login to your account</p>
+          </div>
 
-      {success && (
-        <div
-          role="status"
-          style={{
-            color: "#2f855a",
-            backgroundColor: "#f0fff4",
-            padding: "0.75rem 1rem",
-            borderRadius: 4,
-            marginBottom: 16,
-            fontSize: "0.875rem",
-          }}
-        >
-          Login successful
-        </div>
-      )}
+          <div className="space-y-6">
+            {/* Email Input */}
+            <div>
+              <label className="block text-gray-700 text-sm font-semibold mb-2">
+                Email Address
+              </label>
+              <div className="relative">
+                <input
+                  type="email"
+                  className="w-full px-4 py-3 border border-purple-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-transparent transition-all duration-200 bg-white bg-opacity-90"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your.email@student.prasetiyamulya.ac.id"
+                  required
+                  disabled={loading}
+                />
+              </div>
+            </div>
 
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: 20 }}>
-          <label
-            htmlFor="email"
-            style={{
-              display: "block",
-              marginBottom: 8,
-              fontSize: "0.875rem",
-              fontWeight: 500,
-              color: "#4a5568",
-            }}
-          >
-            Email address
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "0.75rem 1rem",
-              borderRadius: 4,
-              border: "1px solid #e2e8f0",
-              backgroundColor: "#ffffff",
-              fontSize: "1rem",
-              boxSizing: "border-box",
-              transition: "border-color 0.2s ease",
-            }}
-            placeholder="Enter your email"
-            autoComplete="email"
-          />
-        </div>
+            {/* Password Input */}
+            <div>
+              <label className="block text-gray-700 text-sm font-semibold mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type="password"
+                  className="w-full px-4 py-3 border border-purple-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-transparent transition-all duration-200 bg-white bg-opacity-90"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  required
+                  disabled={loading}
+                  minLength={8}
+                />
+              </div>
+            </div>
 
-        <div style={{ marginBottom: 24 }}>
-          <label
-            htmlFor="password"
-            style={{
-              display: "block",
-              marginBottom: 8,
-              fontSize: "0.875rem",
-              fontWeight: 500,
-              color: "#4a5568",
-            }}
-          >
-            Password
-          </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "0.75rem 1rem",
-              borderRadius: 4,
-              border: "1px solid #e2e8f0",
-              backgroundColor: "#ffffff",
-              fontSize: "1rem",
-              boxSizing: "border-box",
-              transition: "border-color 0.2s ease",
-            }}
-            placeholder="Enter your password"
-            autoComplete="current-password"
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            width: "100%",
-            padding: "0.75rem 1.5rem",
-            backgroundColor: "#4299e1",
-            color: "white",
-            border: "none",
-            borderRadius: 4,
-            fontSize: "1rem",
-            fontWeight: 500,
-            cursor: loading ? "not-allowed" : "pointer",
-            opacity: loading ? 0.7 : 1,
-            transition: "background-color 0.2s ease",
-          }}
-        >
-          {loading ? "Logging in..." : "Sign In"}
-        </button>
-      </form>
+            {/* Error Message */}
+            {error && (
+              <div className="p-4 rounded-lg bg-red-50 border border-red-200 animate-shake">
+                <div className="flex items-start">
+                  <svg
+                    className="w-5 h-5 text-red-600 mt-0.5 mr-2 flex-shrink-0"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <p className="text-red-700 text-sm font-medium">{error}</p>
+                </div>
+              </div>
+            )}
 
-      <div
-        style={{
-          marginTop: 24,
-          textAlign: "center",
-          color: "#4a5568",
-          fontSize: "0.875rem",
-        }}
-      >
-        Don't have an account?{" "}
-        <button
-          onClick={onRegisterClick}
-          style={{
-            background: "none",
-            border: "none",
-            padding: 0,
-            margin: 0,
-            font: "inherit",
-            color: "#4299e1",
-            cursor: "pointer",
-            textDecoration: "underline",
-          }}
-        >
-          Sign up
-        </button>
+            {/* Success Message */}
+            {success && (
+              <div className="p-4 rounded-lg bg-green-50 border border-green-200 animate-fade-in">
+                <div className="flex items-start">
+                  <svg
+                    className="w-5 h-5 text-green-600 mt-0.5 mr-2 flex-shrink-0"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <p className="text-green-700 text-sm font-medium">
+                    {success}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold py-3 px-4 rounded-xl transition duration-200 transform hover:scale-[1.02] disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none shadow-lg hover:shadow-xl"
+              disabled={loading}
+            >
+              {loading ? (
+                <span className="flex items-center justify-center">
+                  <svg
+                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  Processing...
+                </span>
+              ) : (
+                "Sign In"
+              )}
+            </button>
+
+            {/* Additional Links */}
+            <div className="text-center text-sm text-gray-600">
+              <p>
+                Don't have an account?{" "}
+                <a
+                  href="/register"
+                  className="text-purple-600 hover:text-purple-700 font-semibold transition-colors"
+                >
+                  Register here
+                </a>
+              </p>
+            </div>
+          </div>
+        </form>
       </div>
     </div>
   );
-}
+};
+
+export default LoginForm;
